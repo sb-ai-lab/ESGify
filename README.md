@@ -1,7 +1,8 @@
 ##ESGify
 ---
 ## Main information
-We introduce the model for multilabel ESG risks classification. There is 47 classes methodology with granularial risk definition.   
+We introduce the model for multilabel ESG risks classification. There is 47 classes methodology with granularial risk definition. 
+Weights uploads on Huggingface https://huggingface.co/ai-lab/ESGify/
 
 ## Usage 
 ```python
