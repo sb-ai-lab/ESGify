@@ -1,4 +1,4 @@
-##ESGify
+## ESGify
 ---
 ## Main information
 We introduce English language model for multilabel ESG risks classification. There is 47 classes methodology with granularial risk definition. 
