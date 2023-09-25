@@ -1,15 +1,21 @@
-## ESGify
----
-## Main information
-We introduce English language model for multilabel ESG risks classification. There is 47 classes methodology with granularial risk definition. 
-Weights uploads on Huggingface https://huggingface.co/ai-lab/ESGify/
 
-## Usage 
+![esgify](ESGify.png)
+# About ESGify
+**ESGify** is a model for multilabel news classification with respect to ESG risks. Weights are uploaded on Huggingface https://huggingface.co/ai-lab/ESGify/ 
+Our custom methodology includes 46 ESG classes and 1 non-relevant to ESG class, resulting in 47 classes in total:
+
+![esgify_classes](ESGify_classes.png)
+
+# Usage 
+
+ESGify is based on MPNet architecture but with a custom classification head. The ESGify class is defined is follows.
+
 ```python
 from collections import OrderedDict
 from transformers import MPNetPreTrainedModel, MPNetModel, AutoTokenizer
 import torch
-#Mean Pooling - Take attention mask into account for correct averaging
+
+# Mean Pooling - Take attention mask into account for correct averaging
 def mean_pooling(model_output, attention_mask):
         token_embeddings = model_output #First element of model_output contains all token embeddings
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
@@ -36,8 +42,6 @@ class ESGify(MPNetPreTrainedModel):
 
 
     def forward(self, input_ids, attention_mask):
-
-
          # Feed input to mpnet model
         outputs = self.mpnet(input_ids=input_ids,
                              attention_mask=attention_mask)
@@ -48,9 +52,18 @@ class ESGify(MPNetPreTrainedModel):
         # apply sigmoid
         logits  = 1.0 / (1.0 + torch.exp(-logits))
         return logits
+```
 
+After defining model class, we initialize ESGify and tokenizer with the pre-trained weights
+
+```python
 model = ESGify.from_pretrained('ai-lab/ESGify')
 tokenizer = AutoTokenizer.from_pretrained('ai-lab/ESGify')
+```
+
+Getting results from the model:
+
+```python
 texts = ['text1','text2']
 to_model = tokenizer.batch_encode_plus(
                   texts,
@@ -63,76 +76,28 @@ to_model = tokenizer.batch_encode_plus(
                   return_tensors='pt',
                 )
 results = model(**to_model)
-
-
-# We also recommend preprocess texts with using FLAIR model
-
-from flair.data import Sentence
-from flair.nn import Classifier
-from torch.utils.data import DataLoader
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-
-stop_words = set(stopwords.words('english'))
-tagger = Classifier.load('ner-ontonotes-large')
-tag_list = ['FAC','LOC','ORG','PERSON']
-texts_with_masks = []
-for example_sent in texts:
-    filtered_sentence = []
-    word_tokens = word_tokenize(example_sent)
-    # converts the words in word_tokens to lower case and then checks whether 
-    #they are present in stop_words or not
-    for w in word_tokens:
-        if w.lower() not in stop_words:
-            filtered_sentence.append(w)
-    # make a sentence
-    sentence = Sentence(' '.join(filtered_sentence))
-    # run NER over sentence
-    tagger.predict(sentence)
-    sent = ' '.join(filtered_sentence)
-    k = 0
-    new_string = ''
-    start_t = 0 
-    for i in sentence.get_labels():
-        info = i.to_dict()
-        val = info['value']
-        if info['confidence']>0.8 and val in tag_list : 
-
-            if i.data_point.start_position>start_t :
-                new_string+=sent[start_t:i.data_point.start_position]
-            start_t = i.data_point.end_position
-            new_string+= f'<{val}>'
-    new_string+=sent[start_t:-1]
-    texts_with_masks.append(new_string)
-
-to_model = tokenizer.batch_encode_plus(
-                  texts_with_masks,
-                  add_special_tokens=True,
-                  max_length=512,
-                  return_token_type_ids=False,
-                  padding="max_length",
-                  truncation=True,
-                  return_attention_mask=True,
-                  return_tensors='pt',
-                )
-results = model(**to_model)
 ```
 
-------
+To identify top-3 classes by relevance and their scores: 
 
-## Background
+```python
+for i in torch.topk(results, k=3).indices.tolist()[0]:
+    print(f"{model.id2label[i]}: {np.round(results.flatten()[i].item(), 3)}")
+```
 
-The project aims to develop the ESG Risks classification model with a custom ESG risks definition methodology. 
+For example, for the news "She faced employment rejection because of her gender", we get the following top-3 labels:
+```
+Discrimination: 0.944
+Strategy Implementation: 0.82
+Indigenous People: 0.499
+```
+
+Before training our model, we masked words related to Organisation, Date, Country, and Person to prevent false associations between these entities and risks. Hence, we recommend to process text with FLAIR NER model before inference.
+An example of such preprocessing is given in https://colab.research.google.com/drive/15YcTW9KPSWesZ6_L4BUayqW_omzars0l?usp=sharing.
 
 
-## Training procedure
+# Training procedure
 
-### Pre-training 
-
-We use the pretrained [`microsoft/mpnet-base`](https://huggingface.co/microsoft/mpnet-base) model. 
-Next, we do the domain-adaptation procedure by Mask Language Modeling pertaining with using texts of ESG reports. 
-
-
-#### Training data
-
-We use the ESG news dataset of 2000 texts with manually annotation of ESG specialists.
+We use the pretrained [`microsoft/mpnet-base`](https://huggingface.co/microsoft/mpnet-base) model.
+Next, we do the domain-adaptation procedure by Mask Language Modeling with using texts of ESG reports. 
+Finally, we fine-tune our model on 2000 texts with manually annotation of ESG specialists.
