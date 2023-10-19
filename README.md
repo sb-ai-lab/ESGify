@@ -1,6 +1,7 @@
 
 ![esgify](ESGify.png)
 # About ESGify
+<img src="ESGify_logo.jpeg" alt="image" width="20%" height="auto">
 **ESGify** is a model for multilabel news classification with respect to ESG risks. Weights are uploaded on Huggingface https://huggingface.co/ai-lab/ESGify/ 
 Our custom methodology includes 46 ESG classes and 1 non-relevant to ESG class, resulting in 47 classes in total:
 
